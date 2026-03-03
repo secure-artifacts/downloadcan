@@ -64,10 +64,16 @@
   floatBtn.addEventListener('click', (e) => {
       if (isFloatDragging) return; // 如果是拖拽则不触发点击
       
-      // 用户主动点击浮球，直接展开大面板
+      // 用户主动点击浮球，直接展开大面板，并开启“长亮独立驻扎”模式
       panel.style.display = 'block';
       panel.style.opacity = '1';
-      userDetached = true; // 唤醒后默认为自由拖拽模式，不强制跟随原生面板，直到点📌吸附
+      userDetached = true; 
+      localStorage.setItem('canva-ex-detached', 'true');
+      
+      // 记录默认弹出的位置为主位置
+      localStorage.setItem('canva-ex-left', panel.style.left || 'auto');
+      localStorage.setItem('canva-ex-top', panel.style.top || '70px');
+
       pinBtn.style.display = 'block';
       floatBtn.style.display = 'none'; // 隐藏浮球
   });
@@ -164,14 +170,27 @@
     }
   });
 
-  // --- 面板拖动位置逻辑 ---
   const header = document.getElementById("canva-ex-header");
   const pinBtn = document.getElementById("canva-ex-pin");
   let isDragging = false, startX, startY, initX, initY;
-  let userDetached = false; // 用户是否手动分离了吸附
+  
+  // --- 优先读取记忆的吸附和位置状态 ---
+  let userDetached = localStorage.getItem('canva-ex-detached') === 'true';
+  let savedLeft = localStorage.getItem('canva-ex-left');
+  let savedTop = localStorage.getItem('canva-ex-top');
+
+  // 如果处于分离常驻模式，直接复原位置并展示
+  if (userDetached) {
+      panel.style.display = 'block';
+      panel.style.opacity = '1';
+      panel.style.right = 'auto'; // 强制绝对定位
+      if (savedLeft) panel.style.left = savedLeft;
+      if (savedTop) panel.style.top = savedTop;
+      pinBtn.style.display = 'block';
+      floatBtn.style.display = 'none';
+  }
 
   header.addEventListener("mousedown", (e) => {
-    // 防止点击到折叠按钮也触发拖拽
     if (e.target.tagName.toLowerCase() === 'button') return;
     
     isDragging = true;
@@ -180,7 +199,6 @@
     initX = panel.offsetLeft;
     initY = panel.offsetTop;
     
-    // 一旦开始拖拽，移除 right/top 限制，全部接管为绝对的 left/top
     panel.style.right = 'auto';
     panel.style.left = initX + 'px';
     panel.style.top = initY + 'px';
@@ -191,16 +209,22 @@
   function onMouseMove(e) {
     if (!isDragging) return;
     
-    // 如果发生了移动，标记为已分离，并显示吸附按钮
     if (Math.abs(e.clientX - startX) > 2 || Math.abs(e.clientY - startY) > 2) {
       if (!userDetached) {
         userDetached = true;
+        localStorage.setItem('canva-ex-detached', 'true');
         pinBtn.style.display = 'block';
       }
     }
     
-    panel.style.left = (initX + (e.clientX - startX)) + "px";
-    panel.style.top = (initY + (e.clientY - startY)) + "px";
+    const newLeft = initX + (e.clientX - startX);
+    const newTop = initY + (e.clientY - startY);
+    panel.style.left = newLeft + "px";
+    panel.style.top = newTop + "px";
+    
+    // 实时记忆最后拖拽的位置
+    localStorage.setItem('canva-ex-left', newLeft + "px");
+    localStorage.setItem('canva-ex-top', newTop + "px");
   }
   function onMouseUp() {
     isDragging = false;
@@ -208,9 +232,10 @@
     document.removeEventListener("mouseup", onMouseUp);
   }
 
-  // 恢复吸附按钮
+  // 点击“📌吸附”按钮，恢复跟随原生面板的状态
   pinBtn.addEventListener('click', () => {
     userDetached = false;
+    localStorage.setItem('canva-ex-detached', 'false');
     pinBtn.style.display = 'none';
   });
 
@@ -274,7 +299,7 @@
     }
     // 未找到原生面板，或者正在自动隐藏的过程中
     if (!hideTimeoutId && panel.style.display !== 'none' && !userDetached) {
-        // 只有被允许自动吸附（跟随关闭）的状态下，才触发5秒倒计时
+        // 【关键】只有在没有 Detached (被固定长亮) 的状态下，才允许5秒自动收起
         hideTimeoutId = setTimeout(() => {
             panel.style.opacity = '0';
             setTimeout(() => { 
@@ -463,8 +488,8 @@
     }
   }
   
-  // 注入时检测，如果原面板还没出来，先挂载好悬浮球
-  if (panel.style.display === 'none') {
+  // 注入时检测，如果原面板还没出来，并且用户没有强行驻扎它，先挂载好悬浮球
+  if (panel.style.display === 'none' && !userDetached) {
       floatBtn.style.display = 'flex';
   }
 
