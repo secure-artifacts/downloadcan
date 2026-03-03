@@ -1,0 +1,51 @@
+name: Build Canva Extension
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get version from manifest
+        id: get_version
+        run: |
+          VERSION=$(jq -r .version manifest.json)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Archive Extension Source
+        run: |
+          zip -r "CanvaDownloader_v${{ env.VERSION }}.zip" . -x "*.git*" ".github/*" "README.md"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CanvaDownloader_v${{ env.VERSION }}
+          path: CanvaDownloader_v${{ env.VERSION }}.zip
+
+      - name: Create Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: CanvaDownloader_v${{ env.VERSION }}.zip
+          name: Release v${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}.${{ github.run_number }}
+          body: |
+            🔥 自动化打包构建的 Chrome 扩展版本 v${{ env.VERSION }} 
+
+            **如何安装:**
+            1. 下载上方的 `CanvaDownloader_v${{ env.VERSION }}.zip` 压缩包并解压。
+            2. 在 Chrome 打开 `chrome://extensions/`
+            3. 打开右上角的 **开发者模式**
+            4. 点击左上角的 **加载已解压的扩展程序**，选择解压后的文件夹。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
