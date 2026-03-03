@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Canva 接力下载神仙插件",
-  "version": "1.0",
+  "version": "1.0.1",
   "description": "接力下载，自动批量免刷新，UI优化增强版",
   "permissions": ["activeTab"],
   "content_scripts": [
